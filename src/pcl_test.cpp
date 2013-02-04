@@ -6,18 +6,86 @@
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl/features/integral_image_normal.h>
+#include <pcl/filters/voxel_grid.h>
 //using namespace pcl;
 using namespace std;
 
 typedef pcl::PointXYZ Point;
-typedef pcl::PointCloud<Point> PointCloud;
+typedef pcl::PointCloud<Point> Cloud;
 
-void visualize_pointcloud(const PointCloud::Ptr& points)
+class ComputeProcessingTime
+{
+  public:
+    double tElapsedTime_;
+  #ifdef WIN32
+    // Windows Time 측정
+    LARGE_INTEGER tFreq_, tStart_, tEnd_;
+  #else
+    struct timeval start_time_, end_time_;
+  #endif
+    ComputeProcessingTime()
+    {
+      
+    }
+    ~ComputeProcessingTime()
+    {
+    }
+    void start_time()
+    {
+    #ifdef WIN32
+      QueryPerformanceFrequency(&tFreq_);        // 주파수 측정
+      QueryPerformanceCounter(&tStart_);            // 카운트 시작
+    #else
+      gettimeofday(&start_time_, NULL);
+    #endif
+    }
+    float end_time()
+    {
+     #ifdef WIN32
+      QueryPerformanceCounter(&tEnd_);            // 카운트 종료
+      // 측정 시간 저장
+      tElapsedTime_ = ((tEnd_.QuadPart - tStart_.QuadPart)/(double)tFreq_.QuadPart);
+     #else
+      gettimeofday(&end_time_, NULL);
+      tElapsedTime_ = (end_time_.tv_sec - start_time_.tv_sec) + (double)(end_time_.tv_usec - start_time_.tv_usec)/1000000.0;
+    #endif
+      return tElapsedTime_;
+    }
+
+};
+
+void visualize_pointcloud(const Cloud::Ptr& points)
 {
   // Add clouds to vizualizer
   pcl::visualization::PCLVisualizer viewer;
   viewer.addPointCloud(points, "points");
   viewer.spin();
+}
+
+void down_sample(float leaf_size,const pcl::PointCloud<pcl::PointXYZI>::Ptr &points, const pcl::PointCloud<pcl::PointXYZI>::Ptr &filtered_points)
+{
+  pcl::VoxelGrid<pcl::PointXYZI> vox;
+  vox.setInputCloud(points);
+  vox.setLeafSize(leaf_size, leaf_size, leaf_size);
+  vox.filter(*filtered_points);
+  cout << "Voxel Grid: " <<points->width * points->height << " --> " 
+    << filtered_points->width * filtered_points->height << endl;
+}
+
+// neighbor_method 0: Radius search, 1:KNN search
+void compute_surface_normals(bool neighbor_method, float neighbor_param, const pcl::PointCloud<pcl::PointXYZI>::Ptr &points, const pcl::PointCloud<pcl::Normal>::Ptr &normals)
+{
+  // Surface Normal Computation 
+  pcl::NormalEstimation<pcl::PointXYZI, pcl::Normal> ne;
+  ne.setInputCloud(points);
+  pcl::search::KdTree<pcl::PointXYZI>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZI>());
+  ne.setSearchMethod(tree);
+  if(!neighbor_method)
+    ne.setRadiusSearch(neighbor_param);
+  else
+    ne.setKSearch(neighbor_param);
+	ne.setViewPoint(0,0,1);
+	ne.compute(*normals);
 }
 
 void pointcloud_demo()
@@ -28,7 +96,7 @@ void pointcloud_demo()
 
 
   // Create new point clouds to hold data
-  PointCloud::Ptr points (new pcl::PointCloud<Point>);
+  Cloud::Ptr points (new Cloud);
 
   // Load point cloud
   pcl::io::loadPCDFile(filename, *points);
@@ -62,36 +130,67 @@ void kitti_demo()
   cout<<"kitti_demo()"<<endl;
   std::string filename;
   std::cout << "Input filename: ";
-  std::cin >> filename;
+//  std::cin >> filename;
+  filename = "0.bin";
+  cout << filename << endl;
 
   pcl::PointCloud<pcl::PointXYZI>::Ptr points (new pcl::PointCloud<pcl::PointXYZI>);
 
-  kitti_open(filename, points);
-
-  cout<<"calculate Normals"<<endl;
-
-  double tElapsedTime;
+  pcl::PointCloud<pcl::PointXYZI>::Ptr filtered_points (new pcl::PointCloud<pcl::PointXYZI>);
+  ///////////////////////////////
+  // Claculating processing time
+  //////////////////////////////
+//  double tElapsedTime;
+  ComputeProcessingTime CPT;
 #ifdef WIN32
   // Windows Time 측정
   LARGE_INTEGER        tFreq, tStart, tEnd;
-
-  QueryPerformanceFrequency(&tFreq);        // 주파수 측정
-  QueryPerformanceCounter(&tStart);            // 카운트 시작
 #else
   struct timeval start_time, end_time;
+#endif
+
+//  kitti_open(filename, points);
+  kitti_open(filename, filtered_points);
+
+#ifdef WIN32
+  QueryPerformanceFrequency(&tFreq);        // 주파수 측정
+  QueryPerformanceCounter(&tStart);            // 카운트 시작
+#else
   gettimeofday(&start_time, NULL);
 #endif
 
-  // 시간 측정을 위한 소스 코드
-  pcl::NormalEstimation<pcl::PointXYZI, pcl::Normal> ne;
-  ne.setInputCloud(points);
+
+  CPT.start_time();
+  down_sample(0.1f, filtered_points, points);
+//  down_sample(0.5f, points, filtered_points);
+
+#ifdef WIN32
+	QueryPerformanceCounter(&tEnd);            // 카운트 종료
+	// 측정 시간 저장
+	tElapsedTime = ((tEnd.QuadPart - tStart.QuadPart)/(double)tFreq.QuadPart);
+#else
+  gettimeofday(&end_time, NULL);
+  tElapsedTime = (end_time.tv_sec - start_time.tv_sec) + (double)(end_time.tv_usec - start_time.tv_usec)/1000000.0;
+#endif
+
+  float CPT_time = CPT.end_time();
+	cout << "ElaspedTime for Voxel Filter:"<< tElapsedTime<<"sec, " << CPT_time<< endl;
+
+
+  cout<<"calculate Normals"<<endl;
+
+#ifdef WIN32
+  QueryPerformanceFrequency(&tFreq);        // 주파수 측정
+  QueryPerformanceCounter(&tStart);            // 카운트 시작
+#else
+  gettimeofday(&start_time, NULL);
+#endif
+
+  CPT.start_time();
   pcl::search::KdTree<pcl::PointXYZI>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZI>());
-  ne.setSearchMethod(tree);
   pcl::PointCloud<pcl::Normal>::Ptr cloud_normals(new pcl::PointCloud<pcl::Normal>);
-  //ne.setRadiusSearch(0.2);
-  ne.setKSearch(4);
-	ne.setViewPoint(1,0,1);
-	ne.compute(*cloud_normals);
+  //0:Radisu Search, 1: KNN Search
+  compute_surface_normals(1, 4, points, cloud_normals);
 
 #ifdef WIN32
 	QueryPerformanceCounter(&tEnd);            // 카운트 종료
@@ -101,7 +200,8 @@ void kitti_demo()
   gettimeofday(&end_time, NULL);
   tElapsedTime = (end_time.tv_sec - start_time.tv_sec) + (double)(end_time.tv_usec - start_time.tv_usec)/1000000.0;
 #endif
-	cout << "ElaspedTime:"<< tElapsedTime<<"sec" << endl;
+  CPT_time = CPT.end_time();
+	cout << "ElaspedTime:"<< tElapsedTime<<"sec " << CPT_time << endl;
 
 #ifdef WIN32
   QueryPerformanceFrequency(&tFreq);        // 주파수 측정
@@ -109,16 +209,11 @@ void kitti_demo()
 #else
   gettimeofday(&start_time, NULL);
 #endif
+  CPT.start_time();
  // 시간 측정을 위한 소스 코드
-  pcl::NormalEstimation<pcl::PointXYZI, pcl::Normal> ne1;
-  ne1.setInputCloud(points);
-  ne1.setSearchMethod(tree);
-  ne1.setRadiusSearch(0.02);
-  //ne1.setKSearch(10);
-  ne1.setViewPoint(0,0,1);
   pcl::PointCloud<pcl::Normal>::Ptr cloud_normals1(new pcl::PointCloud<pcl::Normal>);
-  ne1.compute(*cloud_normals1);
 
+  compute_surface_normals(1, 8, points, cloud_normals1);
 #ifdef WIN32
 	QueryPerformanceCounter(&tEnd);            // 카운트 종료
 	// 측정 시간 저장
@@ -127,7 +222,8 @@ void kitti_demo()
   gettimeofday(&end_time, NULL);
   tElapsedTime = (end_time.tv_sec - start_time.tv_sec) + (double)(end_time.tv_usec - start_time.tv_usec)/1000000.0;
 #endif
-  cout << "ElaspedTime1:"<< tElapsedTime<<"sec" << endl;
+  CPT_time = CPT.end_time();
+  cout << "ElaspedTime1:"<< tElapsedTime<<"sec " << CPT_time << endl;
 
 #ifdef WIN32
   QueryPerformanceFrequency(&tFreq);        // 주파수 측정
@@ -135,16 +231,11 @@ void kitti_demo()
 #else
   gettimeofday(&start_time, NULL);
 #endif
+  CPT.start_time();
   // estimate normals
   pcl::PointCloud<pcl::Normal>::Ptr cloud_normals2(new pcl::PointCloud<pcl::Normal>);
 
-  pcl::NormalEstimation<pcl::PointXYZI, pcl::Normal> ne2;
-  ne2.setInputCloud(points);
-  ne2.setSearchMethod(tree);
-  ne2.setRadiusSearch(0.2);
-  //ne1.setKSearch(10);
-  ne2.setViewPoint(0,0,1);
-  ne2.compute(*cloud_normals2);
+  compute_surface_normals(0, 0.2, points, cloud_normals2);
 #ifdef WIN32
 	QueryPerformanceCounter(&tEnd);            // 카운트 종료
 	// 측정 시간 저장
@@ -153,35 +244,36 @@ void kitti_demo()
   gettimeofday(&end_time, NULL);
   tElapsedTime = (end_time.tv_sec - start_time.tv_sec) + (double)(end_time.tv_usec - start_time.tv_usec)/1000000.0;
 #endif
-  cout << "ElaspedTime2:"<< tElapsedTime<<"sec" << endl;
+  CPT_time = CPT.end_time();
+  cout << "ElaspedTime2:"<< tElapsedTime<<"sec " << CPT_time << endl;
 
   cout<<"visualize()"<<endl;
   pcl::visualization::PCLVisualizer viewer;
-  //viewer.initCameraParameters();
+  viewer.initCameraParameters();
   int v1(0);
   viewer.createViewPort(0.0, 0.0,0.325,1.0,v1);
   viewer.setBackgroundColor(0,0,0,v1);
-  viewer.addText("cloud normals with radius search 0.02",10,10,"v1 text",v1);
+  viewer.addText("cloud normals with KNN search 4",10,10,"v1 text",v1);
   pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZI> single_color1(points, 0, 0, 255);
   viewer.addPointCloud<pcl::PointXYZI>(points,single_color1, "points",v1);
   //viewer.addPointCloud<pcl::PointXYZI>(points, "points",v1);
-  viewer.addPointCloudNormals<pcl::PointXYZI, pcl::Normal>(points, cloud_normals1, 10, 0.5, "normals1", v1);
+  viewer.addPointCloudNormals<pcl::PointXYZI, pcl::Normal>(points, cloud_normals, 1, 0.3, "normals", v1);
 
 
   int v2(0);
-  viewer.createViewPort(0.325, 0.0,1.0,1.0,v2);
+  viewer.createViewPort(0.3375, 0.0,1.0,1.0,v2);
   viewer.setBackgroundColor(0.2,0.2,0.2,v2);
-  viewer.addText("cloud normals with knn search 4",10,10,"v2 text",v2);
+  viewer.addText("cloud normals with KNN search 8",10,10,"v2 text",v2);
   pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZI> single_color(points, 0, 255, 0);
   viewer.addPointCloud<pcl::PointXYZI>(points,single_color, "points1",v2);
-  viewer.addPointCloudNormals<pcl::PointXYZI, pcl::Normal>(points, cloud_normals, 10, 0.5, "normals", v2);
+  viewer.addPointCloudNormals<pcl::PointXYZI, pcl::Normal>(points, cloud_normals1, 1, 0.3, "normals1", v2);
   int v3(0);
   viewer.createViewPort(0.675, 0.0,1.0,1.0,v3);
   viewer.setBackgroundColor(0.3,0.3,0.3,v3);
   viewer.addText("cloud normals with radius search 0.2",10,10,"v3 text",v3);
   pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZI> single_color2(points, 255, 0, 0);
   viewer.addPointCloud<pcl::PointXYZI>(points,single_color2, "points2",v3);
-  viewer.addPointCloudNormals<pcl::PointXYZI, pcl::Normal>(points, cloud_normals2, 10, 0.5, "normals2", v3);
+  viewer.addPointCloudNormals<pcl::PointXYZI, pcl::Normal>(points, cloud_normals2, 1, 0.3, "normals2", v3);
 
   viewer.addCoordinateSystem(1.0);
   viewer.spin();
