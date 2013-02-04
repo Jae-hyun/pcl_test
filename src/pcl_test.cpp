@@ -96,7 +96,7 @@ void kitti_demo()
 #ifdef WIN32
 	QueryPerformanceCounter(&tEnd);            // 카운트 종료
 	// 측정 시간 저장
-	tElapsedTime = ((tEnd.QuadPart - tStart.QuadPart)/(double)tFreq.QuadPart)*1000;
+	tElapsedTime = ((tEnd.QuadPart - tStart.QuadPart)/(double)tFreq.QuadPart);
 #else
   gettimeofday(&end_time, NULL);
   tElapsedTime = (end_time.tv_sec - start_time.tv_sec) + (double)(end_time.tv_usec - start_time.tv_usec)/1000000.0;
@@ -122,7 +122,7 @@ void kitti_demo()
 #ifdef WIN32
 	QueryPerformanceCounter(&tEnd);            // 카운트 종료
 	// 측정 시간 저장
-	tElapsedTime = ((tEnd.QuadPart - tStart.QuadPart)/(double)tFreq.QuadPart)*1000;
+	tElapsedTime = ((tEnd.QuadPart - tStart.QuadPart)/(double)tFreq.QuadPart);
 #else
   gettimeofday(&end_time, NULL);
   tElapsedTime = (end_time.tv_sec - start_time.tv_sec) + (double)(end_time.tv_usec - start_time.tv_usec)/1000000.0;
@@ -148,7 +148,7 @@ void kitti_demo()
 #ifdef WIN32
 	QueryPerformanceCounter(&tEnd);            // 카운트 종료
 	// 측정 시간 저장
-	tElapsedTime = ((tEnd.QuadPart - tStart.QuadPart)/(double)tFreq.QuadPart)*1000;
+	tElapsedTime = ((tEnd.QuadPart - tStart.QuadPart)/(double)tFreq.QuadPart);
 #else
   gettimeofday(&end_time, NULL);
   tElapsedTime = (end_time.tv_sec - start_time.tv_sec) + (double)(end_time.tv_usec - start_time.tv_usec)/1000000.0;
