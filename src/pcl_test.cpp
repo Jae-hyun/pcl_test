@@ -11,11 +11,16 @@
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/sample_consensus/method_types.h>
 #include <pcl/sample_consensus/model_types.h>
+
+#include <pcl/range_image/range_image.h>
+
 //using namespace pcl;
 using namespace std;
 
 typedef pcl::PointXYZ Point;
 typedef pcl::PointCloud<Point> Cloud;
+
+
 
 class ComputeProcessingTime
 {
@@ -58,6 +63,26 @@ class ComputeProcessingTime
 
 };
 
+void range_image_creation(const pcl::PointCloud<pcl::PointXYZI>::Ptr &points)
+{
+  float angularResolution = (float) ( 4.95f * (M_PI/180.0f));
+  float maxAngleWidth      = (float) ( 360.0f * (M_PI/180.0f));
+  float maxAnglHeight      = (float) ( 180.f * (M_PI/180.0f));
+
+  Eigen::Affine3f sensorPose = (Eigen::Affine3f)Eigen::Translation3f(0.0f, 0.0f, 0.0f);
+  pcl::RangeImage::CoordinateFrame coordnate_frame = pcl::RangeImage::CAMERA_FRAME;
+  float noiseLevel = 0.0f;
+  float minRange = 0.0f;
+  int borderSize = 0;
+
+  cout << "range image creation" << endl;
+  pcl::RangeImage rangeImage;
+  rangeImage.createFromPointCloud(*points, 4.95,0.4, maxAngleWidth, maxAnglHeight, 
+      sensorPose, coordnate_frame, noiseLevel, minRange, borderSize);
+
+  std::cout << rangeImage << std::endl;
+ 
+}
 void visualize_pointcloud(const Cloud::Ptr& points)
 {
   // Add clouds to vizualizer
@@ -151,8 +176,10 @@ void kitti_demo()
 //  kitti_open(filename, points);
   kitti_open(filename, filtered_points);
 
+  pcl::RangeImage::Ptr range_image(new pcl::RangeImage);
+  range_image_creation(filtered_points);
   CPTime.start_time();
-    down_sample(0.2f, filtered_points, points);
+  down_sample(0.2f, filtered_points, points);
 //  down_sample(0.5f, points, filtered_points);
 
   float CP_time = CPTime.end_time();
