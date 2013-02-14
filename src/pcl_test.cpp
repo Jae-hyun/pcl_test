@@ -13,6 +13,7 @@
 #include <pcl/sample_consensus/model_types.h>
 
 #include <pcl/range_image/range_image.h>
+#include <pcl/visualization/range_image_visualizer.h>
 
 //using namespace pcl;
 using namespace std;
@@ -133,6 +134,8 @@ void pointcloud_demo()
   // Visualize point cloud
   visualize_pointcloud(points);
 }
+
+
 void kitti_open(string filename, pcl::PointCloud<pcl::PointXYZI>::Ptr &points)
 {
 	cout<<"kitti_file_open()"<<endl;
@@ -153,6 +156,63 @@ void kitti_open(string filename, pcl::PointCloud<pcl::PointXYZI>::Ptr &points)
 	}
 	input.close();
 	cout << "Read KTTI point cloud with " << i << " points" << endl;
+}
+
+void range_image_demo()
+{
+	pcl::PointCloud<pcl::PointXYZ> pointCloud;
+	std::string filename;
+	filename = "0.bin";
+
+
+  pcl::PointCloud<pcl::PointXYZI>::Ptr points (new pcl::PointCloud<pcl::PointXYZI>);
+
+
+  kitti_open(filename, points);
+
+
+  points->width = 10000;
+  points->points.resize(points->width * points->height);
+  pcl::PointCloud<pcl::PointXYZI>& point_cloud = *points;
+  // Generate the data
+  for (float y=-0.5f; y<=0.5f; y+=0.01f) {
+    for (float z=-0.5f; z<=0.5f; z+=0.01f) {
+      pcl::PointXYZ point;
+      point.x = 2.0f - y;
+      point.y = y;
+      point.z = z;
+      pointCloud.points.push_back(point);
+    }
+  }
+  pointCloud.width = (uint32_t) pointCloud.points.size();
+  pointCloud.height = 1;
+  // We now want to create a range image from the above point cloud, with a 1deg angular resolution
+  float angularResolution = (float) (  1.0f * (M_PI/180.0f));  //   1.0 degree in radians
+  float maxAngleWidth     = (float) (360.0f * (M_PI/180.0f));  // 360.0 degree in radians
+  float maxAngleHeight    = (float) (180.0f * (M_PI/180.0f));  // 180.0 degree in radians
+  Eigen::Affine3f sensorPose = (Eigen::Affine3f)Eigen::Translation3f(0.0f, 0.0f, 0.0f);
+  //pcl::RangeImage::CoordinateFrame coordinate_frame = pcl::RangeImage::CAMERA_FRAME;
+  pcl::RangeImage::CoordinateFrame coordinate_frame = pcl::RangeImage::LASER_FRAME;
+
+  float noiseLevel=0.05;
+  float minRange = 0.0f;
+  int borderSize = 1;
+  
+  pcl::RangeImage rangeImage;
+  rangeImage.createFromPointCloud(point_cloud,pcl::deg2rad(0.49462f), pcl::deg2rad(0.41875f), maxAngleWidth, maxAngleHeight,
+                                  sensorPose, coordinate_frame, noiseLevel, minRange, borderSize);
+  //rangeImage.createFromPointCloud(*filtered_points,pcl::deg2rad(4.9462f), pcl::deg2rad(0.41875f), maxAngleWidth, maxAngleHeight,
+  //                                sensorPose, coordinate_frame, noiseLevel, minRange, borderSize);
+  
+  std::cout << rangeImage << "\n";
+  
+  // --------------------------
+  // -----Show range image-----
+  // --------------------------
+  pcl::visualization::RangeImageVisualizer range_image_widget ("Range image");
+  range_image_widget.showRangeImage (rangeImage);
+
+  range_image_widget.spin ();
 }
 void kitti_demo()
 {
@@ -176,8 +236,9 @@ void kitti_demo()
 //  kitti_open(filename, points);
   kitti_open(filename, filtered_points);
 
-  pcl::RangeImage::Ptr range_image(new pcl::RangeImage);
-  range_image_creation(filtered_points);
+  //filtered_points->width = 114304;
+  //filtered_points->points.resize(filtered_points->width * filtered_points->height);
+  
   CPTime.start_time();
   down_sample(0.2f, filtered_points, points);
 //  down_sample(0.5f, points, filtered_points);
@@ -317,6 +378,7 @@ int main (int argc, char** argv)
   //pointcloud_demo();
   //kitti_pcd();
   kitti_demo();
+  //range_image_demo();
   return (0);
 }
 
