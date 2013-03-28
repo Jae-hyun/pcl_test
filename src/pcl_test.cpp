@@ -162,28 +162,35 @@ void range_image_demo()
 {
 	pcl::PointCloud<pcl::PointXYZ> pointCloud;
 	std::string filename;
-	filename = "0.bin";
+//    filename = "0.bin";
+    std::cout << "Input filename: ";
+    std::cin >> filename;
 
 
-  pcl::PointCloud<pcl::PointXYZI>::Ptr points (new pcl::PointCloud<pcl::PointXYZI>);
+  //pcl::PointCloud<pcl::PointXYZI>::Ptr points (new pcl::PointCloud<pcl::PointXYZI>);
+  pcl::PointCloud<pcl::PointXYZ>::Ptr points (new pcl::PointCloud<pcl::PointXYZ>);
 
 
-  kitti_open(filename, points);
+  pcl::io::loadPCDFile(filename, *points);
+//  kitti_open(filename, points);
 
 
-  points->width = 10000;
+//    std::string filename;
+  // Adjust point num wrt real pcd size.
+  points->width = 65000;
   points->points.resize(points->width * points->height);
-  pcl::PointCloud<pcl::PointXYZI>& point_cloud = *points;
+  //pcl::PointCloud<pcl::PointXYZI>& point_cloud = *points;
+  pcl::PointCloud<Point>& point_cloud = *points;
   // Generate the data
-  for (float y=-0.5f; y<=0.5f; y+=0.01f) {
-    for (float z=-0.5f; z<=0.5f; z+=0.01f) {
-      pcl::PointXYZ point;
-      point.x = 2.0f - y;
-      point.y = y;
-      point.z = z;
-      pointCloud.points.push_back(point);
-    }
-  }
+//  for (float y=-0.5f; y<=0.5f; y+=0.01f) {
+//    for (float z=-0.5f; z<=0.5f; z+=0.01f) {
+//      pcl::PointXYZ point;
+//      point.x = 2.0f - y;
+//      point.y = y;
+//      point.z = z;
+//      pointCloud.points.push_back(point);
+//    }
+//  }
   pointCloud.width = (uint32_t) pointCloud.points.size();
   pointCloud.height = 1;
   // We now want to create a range image from the above point cloud, with a 1deg angular resolution
@@ -382,10 +389,10 @@ int main (int argc, char** argv)
 
   // for (size_t i = 0; i < cloud.points.size (); ++i)
   //   std::cerr << "    " << cloud.points[i].x << " " << cloud.points[i].y << " " << cloud.points[i].z << std::endl;
-  //pointcloud_demo();
+//  pointcloud_demo();
   //kitti_pcd();
-  kitti_demo();
-  //range_image_demo();
+  //kitti_demo();
+  range_image_demo();
   return (0);
 }
 
