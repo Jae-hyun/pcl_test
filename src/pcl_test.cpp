@@ -331,6 +331,13 @@ void kitti_demo()
 
   viewer.addCoordinateSystem(1.0);
   viewer.spin();
+
+  pcl::PCDWriter writer;
+  std::string output_filename = "output.pcd";
+  pcl::PointCloud<pcl::PointXYZINormal>::Ptr p_n_cloud_c(new pcl::PointCloud<pcl::PointXYZINormal>);
+  pcl::concatenateFields (*points, *cloud_normals, *p_n_cloud_c);
+  // Save DoN features
+  writer.write<pcl::PointXYZINormal> (output_filename, *p_n_cloud_c, false);
 }
 void kitti_pcd()
 {
